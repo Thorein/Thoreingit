@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kto jest dzisiaj głupi?</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin-bottom: 40px;
+        }
+
+        /* Wskaźnik */
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #e74c3c;
+            z-index: 10;
+            filter: drop-shadow(0 4px 2px rgba(0,0,0,0.3));
+        }
+
+        /* Koło */
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 8px solid #34495e;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+            /* To jest klucz do animacji - cubic-bezier daje efekt zwalniania */
+            transition: transform 6s cubic-bezier(0.2, 0.8, 0.2, 1);
+            /* Kolory sektorów */
+            background: conic-gradient(
+                #3498db 0deg 120deg,   /* Bartek */
+                #9b59b6 120deg 240deg, /* Oskar */
+                #f1c40f 240deg 360deg  /* Stasia */
+            );
+        }
+
+        /* Tekst na kole */
+        .label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: 0 0;
+            font-weight: bold;
+            font-size: 18px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            width: 50%; /* Promień koła */
+            text-align: right;
+            padding-right: 30px;
+            box-sizing: border-box;
+        }
+
+        /* Pozycjonowanie imion na sektorach */
+        /* Bartek - środek sektora 0-120 to 60 stopni */
+        .label-1 { transform: rotate(60deg) translate(0, -50%); }
+        /* Oskar - środek sektora 120-240 to 180 stopni */
+        .label-2 { transform: rotate(180deg) translate(0, -50%); }
+        /* Stasia - środek sektora 240-360 to 300 stopni */
+        .label-3 { transform: rotate(300deg) translate(0, -50%); }
+
+
+        #result-container {
+            text-align: center;
+            min-height: 60px;
+        }
+
+        #result-text {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e74c3c;
+            opacity: 0;
+            transition: opacity 1s ease-in;
+        }
+        
+        .date-info {
+            margin-top: 20px;
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Kto jest dzisiaj głupi?</h1>
+
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <div class="wheel" id="wheel">
+            <div class="label label-1">Bartek</div>
+            <div class="label label-2">Oskar</div>
+            <div class="label label-3">Stasia</div>
+        </div>
+    </div>
+
+    <div id="result-container">
+        <div id="result-text">Losowanie...</div>
+    </div>
+    <div class="date-info">Wynik jest generowany raz dziennie.</div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const wheel = document.getElementById('wheel');
+            const resultText = document.getElementById('result-text');
+            const candidates = ['Bartek', 'Oskar', 'Stasia'];
+            const segmentAngle = 360 / candidates.length; // 120 stopni na osobę
+
+            // 1. Funkcja generująca "ziarno" z dzisiejszej daty.
+            // Dzięki temu wynik jest zawsze ten sam w danym dniu.
+            function getDailySeed() {
+                const now = new Date();
+                // Tworzymy string w formacie RRRRMTD (np. 20231027)
+                const dateString = `${now.getFullYear()}${now.getMonth() + 1}${now.getDate()}`;
+                // Prosta funkcja haszująca zamieniająca string na liczbę
+                let hash = 0;
+                for (let i = 0; i < dateString.length; i++) {
+                    hash = dateString.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                return Math.abs(hash);
+            }
+
+            // 2. Ustalanie zwycięzcy dnia
+            const dailySeed = getDailySeed();
+            // Używamy modulo (reszta z dzielenia), aby uzyskać indeks 0, 1 lub 2
+            const winnerIndex = dailySeed % candidates.length;
+            const winnerName = candidates[winnerIndex];
+
+            // 3. Obliczanie kąta obrotu
+            // Chcemy minimum 8 pełnych obrotów (8 * 360 = 2880 stopni)
+            const baseSpins = 8 * 360;
+            
+            // Obliczamy, gdzie musi zatrzymać się koło.
+            // Wskaźnik jest na górze (0 stopni).
+            // Aby trafić na środek sektora, musimy odjąć odpowiednią ilość stopni.
+            // Indeks 0 (Bartek) środek ma na 60st. Musimy cofnąć o 60.
+            // Indeks 1 (Oskar) środek ma na 180st. Musimy cofnąć o 180.
+            // Indeks 2 (Stasia) środek ma na 300st. Musimy cofnąć o 300.
+            // Wzór: (Indeks * 120) + 60 (połowa sektora)
+            const targetSegmentCenterAngle = (winnerIndex * segmentAngle) + (segmentAngle / 2);
+            
+            // Finalny kąt to pełne obroty MINUS kąt potrzebny, by dany sektor znalazł się na górze
+            const finalRotation = baseSpins - targetSegmentCenterAngle;
+
+
+            // 4. Uruchomienie animacji (z lekkim opóźnieniem po załadowaniu strony)
+            setTimeout(() => {
+                // Aplikujemy obrót w CSS. Przeglądarka zajmie się animacją dzięki 'transition'
+                wheel.style.transform = `rotate(${finalRotation}deg)`;
+
+                // 5. Pokazanie wyniku po zakończeniu animacji (6 sekund)
+                setTimeout(() => {
+                    resultText.innerHTML = `Dzisiaj głupi jest: <br> ${winnerName.toUpperCase()}!`;
+                    resultText.style.opacity = 1;
+                }, 6000); // Czas musi się zgadzać z czasem transition w CSS (6s)
+            }, 500);
+        });
+    </script>
+</body>
+</html>
