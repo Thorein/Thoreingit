@@ -7,23 +7,50 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #2c3e50;
-            color: #ecf0f1;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden; /* Ukryj pasek przewijania poziomego */
+            background-color: #f0f0f0; /* Jasne tło, żeby było widać czarne rysunki */
+            color: #333;
+        }
+
+        /* --- STYL DLA RYSOWANIA (CANVAS) --- */
+        #drawing-board {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1; /* Tło jest na poziomie 1 */
+            cursor: crosshair;
+            touch-action: none; /* Blokuje przesuwanie ekranu podczas rysowania na telefonie */
+        }
+
+        /* --- KONTENER GŁÓWNY (Żeby koło było NAD rysunkiem) --- */
+        .main-content {
+            position: relative;
+            z-index: 10; /* Wszystko ważnego jest wyżej niż rysunek */
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
-            min-height: 100vh;
-            margin: 0;
             padding-top: 20px;
+            pointer-events: none; /* To pozwala klikać "przez" puste miejsca, żeby rysować */
+        }
+
+        /* Elementy interaktywne muszą mieć pointer-events: auto, żeby dało się je klikać */
+        h1, .wheel-container, button, .chat-section, #result-container {
+            pointer-events: auto;
         }
 
         h1 {
-            margin-bottom: 20px;
             text-align: center;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            background: rgba(255,255,255,0.8);
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
+        /* --- KOŁO FORTUNY --- */
         .wheel-container {
             position: relative;
             width: 300px;
@@ -31,36 +58,34 @@
             margin-bottom: 30px;
         }
 
-        /* Wskaźnik */
         .pointer {
             position: absolute;
-            top: -20px;
+            top: -25px;
             left: 50%;
             transform: translateX(-50%);
             width: 0;
             height: 0;
-            border-left: 15px solid transparent;
-            border-right: 15px solid transparent;
-            border-top: 30px solid #e74c3c;
-            z-index: 10;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #e74c3c;
+            z-index: 20;
             filter: drop-shadow(0 4px 2px rgba(0,0,0,0.3));
         }
 
-        /* Koło */
         .wheel {
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            border: 8px solid #34495e;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 10px solid #2c3e50;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
             position: relative;
             overflow: hidden;
-            /* ZMIANA: Wydłużony czas do 10 sekund */
-            transition: transform 10s cubic-bezier(0.1, 0.95, 0.1, 1); 
+            /* Czas kręcenia: 8 sekund */
+            transition: transform 8s cubic-bezier(0.1, 0.99, 0.1, 1); 
             background: conic-gradient(
-                #3498db 0deg 120deg,   /* Bartek */
-                #9b59b6 120deg 240deg, /* Oskar */
-                #f1c40f 240deg 360deg  /* Stasia */
+                #3498db 0deg 120deg,   /* Bartek - Niebieski */
+                #9b59b6 120deg 240deg, /* Oskar - Fioletowy */
+                #f1c40f 240deg 360deg  /* Stasia - Żółty */
             );
         }
 
@@ -70,137 +95,239 @@
             left: 50%;
             transform-origin: 0 0;
             font-weight: bold;
-            font-size: 18px;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            font-size: 20px;
+            color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
             width: 50%;
             text-align: right;
-            padding-right: 30px;
+            padding-right: 35px;
             box-sizing: border-box;
         }
 
+        /* Pozycjonowanie imion */
         .label-1 { transform: rotate(60deg) translate(0, -50%); }
         .label-2 { transform: rotate(180deg) translate(0, -50%); }
         .label-3 { transform: rotate(300deg) translate(0, -50%); }
 
+        /* --- WYNIK --- */
         #result-container {
             text-align: center;
-            min-height: 80px;
+            min-height: 100px;
             margin-bottom: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 80%;
+            max-width: 400px;
         }
 
         #result-text {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        #winner-name {
+            display: block;
+            font-size: 42px;
             color: #e74c3c;
-            opacity: 0;
-            transition: opacity 1s ease-in;
+            margin-top: 10px;
+            text-transform: uppercase;
         }
 
+        /* --- PRZYCISK --- */
         button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #e74c3c;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #2c3e50;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 50px;
             cursor: pointer;
-            margin-bottom: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+            margin-bottom: 40px;
         }
-        button:hover { background-color: #c0392b; }
+        button:active { transform: scale(0.95); }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
 
-        /* Styl dla Czatu */
+        /* --- CZAT --- */
         .chat-section {
-            width: 100%;
+            width: 90%;
             max-width: 600px;
-            background: rgba(0,0,0,0.2);
+            background: white;
             padding: 10px;
             border-radius: 10px;
             margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border: 2px solid #2c3e50;
         }
         
         iframe {
             width: 100%;
             height: 400px;
             border: none;
-            border-radius: 5px;
-            background-color: #fff;
+        }
+        
+        .clear-btn {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #e74c3c;
+            font-size: 12px;
+            padding: 5px 10px;
+            z-index: 100;
         }
 
     </style>
 </head>
 <body>
 
-    <h1>Kto jest dzisiaj głupi?</h1>
+    <canvas id="drawing-board"></canvas>
+    
+    <button class="clear-btn" onclick="clearCanvas()">Wyczyść rysunki</button>
 
-    <div class="wheel-container">
-        <div class="pointer"></div>
-        <div class="wheel" id="wheel">
-            <div class="label label-1">Bartek</div>
-            <div class="label label-2">Oskar</div>
-            <div class="label label-3">Stasia</div>
+    <div class="main-content">
+        <h1>Kto jest dzisiaj głupi?</h1>
+
+        <div class="wheel-container">
+            <div class="pointer"></div>
+            <div class="wheel" id="wheel">
+                <div class="label label-1">Bartek</div>
+                <div class="label label-2">Oskar</div>
+                <div class="label label-3">Stasia</div>
+            </div>
+        </div>
+
+        <div id="result-container">
+            <div id="result-text">Kliknij przycisk, aby wylosować!</div>
+        </div>
+
+        <button id="spin-btn" onclick="spinWheel()">ZAKRĘĆ KOŁEM!</button>
+
+        <div class="chat-section">
+            <h3>Czat Ogólny</h3>
+            <iframe src="https://tlk.io/kto-glupi-chat2" allow="camera; microphone;"></iframe>
         </div>
     </div>
 
-    <div id="result-container">
-        <div id="result-text">Czekam na losowanie...</div>
-    </div>
-
-    <button onclick="spinWheel()">Zakręć kołem!</button>
-
-    <div class="chat-section">
-        <h3>Czat Ogólny</h3>
-        <iframe src="https://tlk.io/kto-glupi-chat" allow="camera; microphone;"></iframe>
-    </div>
-
     <script>
+        // --- LOGIKA KOŁA ---
         const wheel = document.getElementById('wheel');
         const resultText = document.getElementById('result-text');
+        const spinBtn = document.getElementById('spin-btn');
+        
+        // Kandydaci i ich kąty
         const candidates = ['Bartek', 'Oskar', 'Stasia'];
         const segmentAngle = 360 / candidates.length; 
+        
         let isSpinning = false;
 
         function spinWheel() {
-            if (isSpinning) return; // Zabezpieczenie przed podwójnym kliknięciem
+            if (isSpinning) return;
             isSpinning = true;
-            resultText.style.opacity = 0;
-            resultText.innerHTML = "Losowanie...";
+            spinBtn.disabled = true; // Zablokuj przycisk
+            resultText.innerHTML = "Losowanie trwa...";
 
-            // 1. Prawdziwe losowanie (Math.random)
+            // 1. Wybieramy zwycięzcę
             const winnerIndex = Math.floor(Math.random() * candidates.length);
             const winnerName = candidates[winnerIndex];
 
-            // 2. Matematyka obrotu
-            // Chcemy dużo obrotów (np. 15), żeby kręciło się 10 sekund
-            const baseSpins = 15 * 360; 
+            // 2. Obliczamy obrót
+            // Chcemy, żeby koło zrobiło np. 8 pełnych obrotów + tyle, żeby trafić w zwycięzcę
+            const baseSpins = 8 * 360; 
             
-            // Obliczamy cel:
-            // Indeks 0 (Bartek) = 60 stopni
-            // Indeks 1 (Oskar) = 180 stopni
-            // Indeks 2 (Stasia) = 300 stopni
-            const targetSegmentCenterAngle = (winnerIndex * segmentAngle) + (segmentAngle / 2);
+            // Matematyka: 
+            // Bartek (index 0) ma środek na 60 stopni.
+            // Oskar (index 1) ma środek na 180 stopni.
+            // Stasia (index 2) ma środek na 300 stopni.
+            const targetCenter = (winnerIndex * segmentAngle) + (segmentAngle / 2);
             
-            // Dodajemy losowy "szum" +/- 40 stopni, żeby nie zawsze zatrzymywało się IDEALNIE na środku,
-            // ale nadal w obrębie pola danej osoby. To wygląda bardziej naturalnie.
+            // Dodajemy losowość +/- 40 stopni, żeby strzałka nie stawała zawsze idealnie na środku pola
             const randomOffset = Math.floor(Math.random() * 80) - 40; 
 
-            // Finalny kąt
-            const finalRotation = baseSpins - targetSegmentCenterAngle + randomOffset;
+            // Finalny kąt obrotu
+            const finalRotation = baseSpins - targetCenter + randomOffset;
 
-            // 3. Start animacji
+            // 3. Kręcimy!
             wheel.style.transform = `rotate(${finalRotation}deg)`;
 
-            // 4. Pokazanie wyniku po 10 sekundach
+            // 4. Czekamy na koniec animacji (8 sekund)
             setTimeout(() => {
-                // Sprawdzamy, czy wylosowane imię zgadza się z tekstem
-                let message = `Głupi jest: <br> ${winnerName.toUpperCase()}!`;
+                // Wyświetl wynik
+                resultText.innerHTML = `Dzisiaj głupi jest: <span id="winner-name">${winnerName}</span>`;
                 
-                resultText.innerHTML = message;
-                resultText.style.opacity = 1;
-                isSpinning = false; // Odblokuj przycisk
+                // Odblokuj przycisk i flagę
+                isSpinning = false;
+                spinBtn.disabled = false;
                 
-                // Resetowanie obrotu (techniczna sztuczka, żeby można było zakręcić jeszcze raz bez przeładowania)
-                // Ale w tej wersji po prostu zostawiamy jak jest.
-            }, 10000); // 10000ms = 10 sekund
+                // UWAGA: Żeby zakręcić drugi raz, trzeba by zresetować transformację, 
+                // ale w najprostszej wersji lepiej po prostu odświeżyć stronę lub zostawić wynik.
+                // Tutaj zostawiamy wynik, żeby każdy widział kto przegrał :)
+            }, 8000); 
+        }
+
+
+        // --- LOGIKA RYSOWANIA ---
+        const canvas = document.getElementById('drawing-board');
+        const ctx = canvas.getContext('2d');
+        let painting = false;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.lineWidth = 4; // Grubość linii
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000000'; // Tylko czarny kolor
+        }
+        
+        // Ustaw rozmiar na start i przy zmianie okna
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function startPosition(e) {
+            painting = true;
+            draw(e);
+        }
+
+        function finishedPosition() {
+            painting = false;
+            ctx.beginPath(); // Reset ścieżki, żeby linie się nie łączyły
+        }
+
+        function draw(e) {
+            if (!painting) return;
+
+            // Obsługa myszki i dotyku
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            
+            // Jeśli to dotyk na telefonie
+            if(e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+
+            ctx.lineTo(clientX, clientY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(clientX, clientY);
+        }
+
+        // Myszka
+        canvas.addEventListener('mousedown', startPosition);
+        canvas.addEventListener('mouseup', finishedPosition);
+        canvas.addEventListener('mousemove', draw);
+
+        // Dotyk (Telefon)
+        canvas.addEventListener('touchstart', (e) => { startPosition(e); });
+        canvas.addEventListener('touchend', finishedPosition);
+        canvas.addEventListener('touchmove', draw);
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     </script>
 </body>
